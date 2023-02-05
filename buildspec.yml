@@ -1,0 +1,14 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+  
+  pre_build:
+    commands:
+    - python --version
+
+  build:
+    commands:
+      - python python/init_account_central_logging.py -d arn:aws:logs:ap-southeast-2:770344015196:destination:CentralLogDestination
