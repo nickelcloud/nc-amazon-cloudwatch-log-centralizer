@@ -1,26 +1,26 @@
 # Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 
-AWSTemplateFormatVersion:          2010-09-09
-Description:                       Set up roles, logs destination, kinesis and delivery stream for centralizing logs to S3 in centralized logging account
+AWSTemplateFormatVersion: 2010-09-09
+Description: Set up roles, logs destination, kinesis and delivery stream for centralizing logs to S3 in centralized logging account
 
 Parameters:
   LoggingS3Bucket:
-    Description:                   ARN of the S3 Logging bucket to write to.
-    MaxLength:                     250
-    MinLength:                     1
-    Type:                          String
+    Description: ARN of the S3 Logging bucket to write to.
+    MaxLength: 250
+    MinLength: 1
+    Type: String
 
 Resources:
   # IAM Roles
   CWLtoFirehoseRole:
-    Type:                          'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
-        Version:                   2012-10-17
+        Version: 2012-10-17
         Statement:
-          - Sid:                   ''
-            Effect:                Allow
+          - Sid: ""
+            Effect: Allow
             Principal:
               Service:
                 - logs.eu-north-1.amazonaws.com
@@ -40,96 +40,96 @@ Resources:
                 - logs.us-east-2.amazonaws.com
                 - logs.us-west-1.amazonaws.com
                 - logs.us-west-2.amazonaws.com
-            Action:                'sts:AssumeRole'
-      Path:                        '/'
+            Action: "sts:AssumeRole"
+      Path: "/"
   CWLtoFirehosePolicy:
-    Type:                          'AWS::IAM::Policy'
+    Type: "AWS::IAM::Policy"
     Properties:
-      PolicyName:                  CWL_to_Kinesis_Policy
+      PolicyName: CWL_to_Kinesis_Policy
       PolicyDocument:
-        Version:                   2012-10-17
+        Version: 2012-10-17
         Statement:
-          - Effect:                Allow
+          - Effect: Allow
             Action:
-              - 'firehose:PutRecord'
+              - "firehose:PutRecord"
             Resource:
-              - !GetAtt            'FirehoseLoggingDeliveryStream.Arn'
-          - Effect:                Allow
+              - !GetAtt "FirehoseLoggingDeliveryStream.Arn"
+          - Effect: Allow
             Action:
-              - 'iam:PassRole'
+              - "iam:PassRole"
             Resource:
-              - !GetAtt           'CWLtoFirehoseRole.Arn'
+              - !GetAtt "CWLtoFirehoseRole.Arn"
       Roles:
-        - !Ref                    CWLtoFirehoseRole
+        - !Ref CWLtoFirehoseRole
   FirehoseDeliveryRole:
-    Type:                          'AWS::IAM::Role'
+    Type: "AWS::IAM::Role"
     Properties:
       AssumeRolePolicyDocument:
-        Version:                   2012-10-17
+        Version: 2012-10-17
         Statement:
-          - Sid:                   ''
-            Effect:                Allow
+          - Sid: ""
+            Effect: Allow
             Principal:
-              Service:             firehose.amazonaws.com
-            Action:                'sts:AssumeRole'
+              Service: firehose.amazonaws.com
+            Action: "sts:AssumeRole"
             Condition:
               StringEquals:
-                'sts:ExternalId':  !Ref 'AWS::AccountId'
+                "sts:ExternalId": !Ref "AWS::AccountId"
   FirehoseDeliveryPolicy:
-    Type:                          'AWS::IAM::Policy'
+    Type: "AWS::IAM::Policy"
     Properties:
-      PolicyName:                  Firehose_Delivery_Policy
+      PolicyName: Firehose_Delivery_Policy
       PolicyDocument:
-        Version:                   2012-10-17
+        Version: 2012-10-17
         Statement:
-          - Effect:                Allow
+          - Effect: Allow
             Action:
-              - 's3:AbortMultipartUpload'
-              - 's3:GetBucketLocation'
-              - 's3:GetObject'
-              - 's3:ListBucket'
-              - 's3:ListBucketMultipartUploads'
-              - 's3:PutObject'
+              - "s3:AbortMultipartUpload"
+              - "s3:GetBucketLocation"
+              - "s3:GetObject"
+              - "s3:ListBucket"
+              - "s3:ListBucketMultipartUploads"
+              - "s3:PutObject"
             Resource:
               - !Ref LoggingS3Bucket
               - !Join
-                - ''
+                - ""
                 - - !Ref LoggingS3Bucket
-                  - '*'
+                  - "*"
       Roles:
         - !Ref FirehoseDeliveryRole
   # Log Destination
   LogDestination:
-    Type:                         AWS::Logs::Destination
+    Type: AWS::Logs::Destination
     DependsOn:
       - FirehoseLoggingDeliveryStream
       - CWLtoFirehoseRole
       - CWLtoFirehosePolicy
     Properties:
-      DestinationName:            CentralLogDestination
-      RoleArn:                    !GetAtt 'CWLtoFirehoseRole.Arn'
-      TargetArn:                  !GetAtt 'FirehoseLoggingDeliveryStream.Arn'
-      DestinationPolicy: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"<AccountNumberHere>\",\"<AccountNumberHere>\",\"<AccountNumberHere>\",\"<AccountNumberHere>\",\"<AccountNumberHere>\"]},\"Action\":\"logs:PutSubscriptionFilter\",\"Resource\":\"arn:aws:logs:<region>:<logging account number>:destination:CentralLogDestination\"}]}"
+      DestinationName: CentralLogDestination
+      RoleArn: !GetAtt "CWLtoFirehoseRole.Arn"
+      TargetArn: !GetAtt "FirehoseLoggingDeliveryStream.Arn"
+      DestinationPolicy: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["155125777142","707887443573","331102656894","272656153670","972086614477", "752009301767"]},"Action":"logs:PutSubscriptionFilter","Resource":"arn:aws:logs:ap-southeast-2:770344015196:destination:CentralLogDestination"}]}'
   # Firehose
   FirehoseLoggingDeliveryStream:
-    Type:                                 'AWS::KinesisFirehose::DeliveryStream'
+    Type: "AWS::KinesisFirehose::DeliveryStream"
     DependsOn:
       - FirehoseDeliveryRole
       - FirehoseDeliveryPolicy
     Properties:
-      DeliveryStreamName:                 'Centralized-Logging-Delivery-Stream'
-      DeliveryStreamType:                  DirectPut
+      DeliveryStreamName: "Centralized-Logging-Delivery-Stream"
+      DeliveryStreamType: DirectPut
       S3DestinationConfiguration:
-        BucketARN:                        !Ref LoggingS3Bucket
+        BucketARN: !Ref LoggingS3Bucket
         BufferingHints:
-          IntervalInSeconds:              '300'
-          SizeInMBs:                      '50'
-        CompressionFormat:                UNCOMPRESSED
-        Prefix:                           'CentralizedAccountLogs/'
-        RoleARN:                          !GetAtt 'FirehoseDeliveryRole.Arn'
+          IntervalInSeconds: "300"
+          SizeInMBs: "50"
+        CompressionFormat: UNCOMPRESSED
+        Prefix: "CentralizedAccountLogs/"
+        RoleARN: !GetAtt "FirehoseDeliveryRole.Arn"
 Outputs:
   DestinationArnExport:
-    Description:                   ARN for the LogDestination
+    Description: ARN for the LogDestination
     Export:
-      Name:                        LogDestinationArn
-    Value:                         !GetAtt 'LogDestination.Arn'
+      Name: LogDestinationArn
+    Value: !GetAtt "LogDestination.Arn"
